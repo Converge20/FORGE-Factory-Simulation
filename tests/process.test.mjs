@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/process.ts',import.meta.url),'utf8');
+const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext}}).outputText;
+const {stations,flowPoints,pointOnFlow}=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+test('six distinct stations carry explanations, equipment and attributable references',()=>{assert.equal(stations.length,6);assert.equal(new Set(stations.map(s=>s.id)).size,6);for(const s of stations){assert.ok(s.detail.length>80);assert.ok(s.equipment.length>=3);assert.ok(s.source);}});
+test('flow samples stay on the connected conveyor centerline',()=>{for(let n=0;n<1000;n++){const p=pointOnFlow(n/1000);assert.ok(p.every(Number.isFinite));assert.ok(flowPoints.slice(1).some((b,i)=>{const a=flowPoints[i];return Math.abs(Math.hypot(p[0]-a[0],p[2]-a[2])+Math.hypot(p[0]-b[0],p[2]-b[2])-Math.hypot(a[0]-b[0],a[2]-b[2]))<1e-8;}));}});
+test('flow wraps consistently and negative progress remains valid',()=>{assert.deepEqual(pointOnFlow(0),pointOnFlow(1));for(const p of [-.1,.1,.5]){const a=pointOnFlow(p),b=pointOnFlow(p+1);a.forEach((v,i)=>assert.ok(Math.abs(v-b[i])<1e-10));}});
