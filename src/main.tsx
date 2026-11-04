@@ -1,50 +1,492 @@
-import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import Scene from './Scene';
-import { stations } from './process';
-import './style.css';
-
-function Icon({name,size=18}:{name:string;size?:number}){const paths:Record<string,React.ReactNode>={play:<path d="m9 5 11 7-11 7z"/>,pause:<><path d="M8 5v14M16 5v14"/></>,arrow:<path d="M4 12h16m-6-6 6 6-6 6"/>,orbit:<><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-30 12 12)"/><ellipse cx="12" cy="12" rx="4" ry="10" transform="rotate(-30 12 12)"/></>,reset:<><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></>,plus:<path d="M5 12h14M12 5v14"/>,minus:<path d="M5 12h14"/>,expand:<path d="M9 4H4v5m11-5h5v5M4 15v5h5m6 0h5v-5"/>,close:<path d="m6 6 12 12M6 18 18 6"/>,book:<><path d="M12 6c-3-2-6-2-10-1v14c4-1 7-1 10 1 3-2 6-2 10-1V5c-4-1-7-1-10 1v14"/></>,layers:<><path d="m12 3 10 6-10 6L2 9zm-9 11 9 5 9-5M3 19l9 5 9-5"/></>,check:<path d="m5 12 4 4L19 6"/>,chevron:<path d="m9 5 7 7-7 7"/>,motion:<path d="M2 8h4m-4 8h4m3-4c0-8 13-8 13 0s-13 8-13 0"/>};return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]??paths.layers}</svg>;}
-function App(){
- const [selected,setSelected]=useState<number|null>(null),[running,setRunning]=useState(true),[tour,setTour]=useState(false),[view,setView]=useState(0),[zoom,setZoom]=useState(0),[labels,setLabels]=useState(true),[info,setInfo]=useState(false),[ready,setReady]=useState(false),[tab,setTab]=useState<'overview'|'research'>('overview');
- const [osReduced,setOsReduced]=useState(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);const [manualReduced,setManualReduced]=useState(false);const reduced=osReduced||manualReduced;
- const dialog=useRef<HTMLDialogElement>(null),sceneEl=useRef<HTMLDivElement>(null);
- const onReady=useCallback(()=>setReady(true),[]);
- useEffect(()=>{const m=matchMedia('(prefers-reduced-motion: reduce)');const fn=()=>setOsReduced(m.matches);m.addEventListener('change',fn);return()=>m.removeEventListener('change',fn);},[]);
- useEffect(()=>{if(!tour||reduced)return;const timer=setInterval(()=>setSelected(v=>{if(v===5){setTour(false);return null;}return (v??-1)+1;}),6500);return()=>clearInterval(timer);},[tour,reduced]);
- useEffect(()=>{if(info)dialog.current?.showModal();else dialog.current?.close();},[info]);
- useEffect(()=>{if(reduced)setTour(false);},[reduced]);
- const select=(i:number)=>{setSelected(i);setTour(false);setView(v=>v+1);};const reset=()=>{setTour(false);setSelected(null);setView(v=>v+1);};const station=selected===null?null:stations[selected];
- return <div className="app-shell">
-  <header className="header"><a className="brand" href="./" aria-label="FORGE home"><span className="brand-mark"><i/><i/><i/></span>FORGE<span className="brand-caption">MANUFACTURING, REVEALED.</span></a><nav aria-label="Main navigation"><button className={tab==='overview'?'nav active':'nav'} onClick={()=>setTab('overview')}>Factory explorer</button><button className={tab==='research'?'nav active':'nav'} onClick={()=>{setTab('research');setInfo(true);}}>Research & sources <span>↗</span></button></nav><div className="phase"><span/> PHASE 01 <b>VISUAL PROTOTYPE</b></div></header>
-  <main>
-   <section className="intro"><div><div className="eyebrow"><span/> INSIDE THE MAKING</div><h1>A small can. <span>An extraordinary journey.</span></h1><p>Explore the machinery, materials, and movement behind beverage manufacturing.</p></div><button className="tour-button" onClick={()=>{if(tour)setTour(false);else{setSelected(0);if(!reduced)setTour(true);}}}><Icon name={tour?'pause':'play'} size={16}/>{tour?'End guided tour':reduced?'Explore the stations':'Take a guided tour'}<span>{reduced?'6 stops':'~40 sec'}</span></button></section>
-   <div className="workspace">
-    <section className="scene-panel" ref={sceneEl} aria-label="Factory explorer">
-     <div className="scene-top"><div><span className="scene-kicker">THE CONNECTED FACTORY</span><h2>From aluminium to finished product</h2></div><span className="live-tag"><i/>{running&&!reduced?'FLOW ACTIVE':'FLOW PAUSED'}</span></div>
-     <Scene selected={selected} running={running} reduced={reduced} view={view} onSelect={select} onReady={onReady} zoom={zoom} labels={labels}/>
-     <div className="station-markers">{stations.map((s,i)=><button key={s.id} data-marker={i} className={`marker ${selected===i?'selected':''}`} aria-label={`Inspect ${s.name}`} onClick={()=>select(i)}><span>{String(i+1).padStart(2,'0')}</span><b>{s.name}</b></button>)}</div>
-     {!ready&&<div className="loading">Preparing the factory…</div>}
-     {tour&&<div className="tour-progress"><span/>GUIDED TOUR <b>{(selected??0)+1} / 6</b><button onClick={()=>setTour(false)} aria-label="End guided tour"><Icon name="close" size={14}/></button></div>}
-     <div className="scene-bottom"><div className="scene-legend"><span><i className="can-dot"/>CAN PRODUCTION</span><span><i className="fill-dot"/>FILLING</span><span><i className="pack-dot"/>PACK & DISPATCH</span></div><div className="scene-tools"><button aria-label={running?'Pause production flow':'Resume production flow'} title={running?'Pause flow':'Resume flow'} onClick={()=>setRunning(v=>!v)}><Icon name={running&&!reduced?'pause':'play'}/></button><span/><button aria-label="Zoom in" title="Zoom in" onClick={()=>setZoom(v=>v+1)}><Icon name="plus"/></button><button aria-label="Zoom out" title="Zoom out" onClick={()=>setZoom(v=>v-1)}><Icon name="minus"/></button><button aria-label="Reset camera" title="Reset camera" onClick={reset}><Icon name="reset"/></button><button aria-label="Toggle fullscreen" title="Fullscreen" onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void sceneEl.current?.requestFullscreen();}}><Icon name="expand"/></button></div></div>
-     <div className="interaction-hint"><Icon name="orbit" size={14}/> Drag to orbit <i/> Scroll to zoom <i/> Select a station to explore</div>
-    </section>
-    <aside className="overview">
-     <div className="aside-heading"><span className="eyebrow">{station?'STATION INSPECTOR':'PRODUCTION OVERVIEW'}</span><button title={station?'Close inspector':'About this reconstruction'} aria-label={station?'Close station inspector':'About this reconstruction'} onClick={()=>station?setSelected(null):setInfo(true)}>{station?<Icon name="close" size={17}/>:<span className="info-icon">i</span>}</button></div>
-     {station?<div className="inspector" key={station.id}><div className="station-no">{String((selected??0)+1).padStart(2,'0')}<span>/ 06</span></div><div className="tiny-label">{station.category}</div><h2>{station.name}</h2><p className="station-lead">{station.description}</p><p className="station-detail">{station.detail}</p><div className="equipment"><div className="tiny-label">MODELED EQUIPMENT</div>{station.equipment.map(t=><p key={t}><Icon name="check" size={13}/>{t}</p>)}</div><div className="source-note"><Icon name="book" size={15}/><span>{station.source}<small>Process reference · geometry is illustrative</small></span></div><button className="next-button" onClick={()=>select(((selected??0)+1)%6)}>Next station <Icon name="arrow" size={16}/></button></div>:<>
-      <div className="overview-title"><span className="status-dot"/>One connected journey<h2>Made to move.</h2><p>Three production areas.<br/>One continuous story.</p></div>
-      <div className="area-list">{[{title:'Can manufacturing',sub:'Shape · wash · coat · inspect',icon:'layers',num:'01–02',s:0},{title:'Beverage & filling',sub:'Prepare · fill · seal',icon:'motion',num:'03–04',s:3},{title:'Packaging & logistics',sub:'Group · pack · dispatch',icon:'layers',num:'05–06',s:4}].map((a,i)=><button key={a.title} onClick={()=>select(a.s)}><span className={`area-icon area-${i}`}><Icon name={a.icon}/></span><span><b>{a.title}</b><small>{a.sub}</small></span><Icon name="chevron" size={14}/></button>)}</div>
-      <div className="flow-summary"><div><strong>06</strong><span>PROCESS STATIONS</span></div><div><strong>01</strong><span>CONNECTED FLOW</span></div></div>
-      <div className="research-card"><span><Icon name="book" size={16}/>BUILT ON PUBLIC RESEARCH</span><p>Real processes.<br/>An illustrative factory.</p><button onClick={()=>setInfo(true)}>Explore the references <Icon name="arrow" size={15}/></button></div>
-      <p className="aside-note">An independent educational reconstruction.<br/>Not affiliated with or endorsed by Red Bull.</p>
-     </>}
-    </aside>
-   </div>
-   <section className="journey" aria-label="Production stations"><div className="journey-label"><span className="eyebrow">FOLLOW THE PROCESS</span><p>Every step has a story.</p></div><div className="steps">{stations.map((s,i)=><button key={s.id} onClick={()=>select(i)} className={selected===i?'step selected':'step'}><span className="step-number">{String(i+1).padStart(2,'0')}</span><span><small>{i<2?'MAKE THE CAN':i<4?'MAKE THE DRINK':'MOVE THE PRODUCT'}</small><b>{s.short}</b></span>{i<5&&<span className="step-arrow">→</span>}</button>)}</div></section>
-   <footer><span><i/> RESEARCH-INFORMED. DESIGNED FOR EXPLORATION.</span><div><button onClick={()=>setLabels(v=>!v)}>{labels?'Hide':'Show'} station labels</button><button aria-pressed={reduced} onClick={()=>setManualReduced(v=>!v)}><Icon name="motion" size={13}/>{reduced?'Reduced motion on':'Reduce motion'}</button><span>FORGE / 001</span></div></footer>
-  </main>
-  <dialog ref={dialog} className="research-dialog" onCancel={()=>{setInfo(false);setTab('overview');}} onClick={e=>{if(e.target===e.currentTarget){setInfo(false);setTab('overview');}}}><div className="dialog-head"><span className="eyebrow">THE EVIDENCE BEHIND THE EXPERIENCE</span><button aria-label="Close research" onClick={()=>{setInfo(false);setTab('overview');}}><Icon name="close"/></button></div><h2>Real processes. An imagined place.</h2><p>FORGE is an independent educational reconstruction inspired by public manufacturing references. It does not reproduce a proprietary Red Bull factory, recipe, or operating configuration.</p><div className="research-columns"><section><h3>Verified process references</h3><a href="https://www.redbull.com/in-en/energydrink/red-bull-can-lifecycle" target="_blank" rel="noreferrer">01 / Red Bull — Can lifecycle ↗</a><p>Documents wall-to-wall can and beverage production with on-site filling, and onward transport.</p><a href="https://www.ball.com/getmedia/4db64513-133d-4fa8-9de0-89fd7c2724f9/How_a_Ball_Metal_Beverage_Can_Is_Made.pdf" target="_blank" rel="noreferrer">02 / Ball — Inside a Ball Beverage Can Plant ↗</a><p>Coil, cupping, drawing and ironing, trimming, washing, coating, curing, necking, flanging, and inspection.</p><a href="https://www.krones.com/en/products/machines/can-filler-seamer-block-modulfill-bloc-fs-c.php" target="_blank" rel="noreferrer">03 / Krones — Can filler-seamer block ↗</a><p>Public equipment documentation for linked rotary filling and seaming.</p><a href="https://www.krones.com/en/products/filling-and-packing-technology/single-machines/palletising-technology/" target="_blank" rel="noreferrer">04 / Krones — Palletising technology ↗</a><p>Automated grouping, pallet handling, and stacking.</p></section><section><h3>Illustrative by design</h3><ul><li>Facility layout, equipment dimensions, and machine appearance.</li><li>Conveyor routing, speed, spacing, robot motion, valve count, and camera timing.</li><li>Beverage tanks and preparation pipework; no formulation is modeled.</li><li>Finishing stages compressed into a few representative enclosures.</li><li>Visible cans are representative flow markers; no throughput or yield prediction.</li><li>Storage capacity and packaging pattern.</li></ul><h3>Original assets, openly reusable</h3><p>All scene models and materials are custom procedural assets, included in source under MIT. Kenney’s <a href="https://kenney.nl/assets/factory-kit" target="_blank" rel="noreferrer">CC0 Factory Kit</a> was researched but not used: bespoke beverage machinery better serves this compact scene. No third-party model files, textures, logos, or source illustrations are redistributed.</p></section></div><div className="dialog-footer">PHASE 01 · VISUAL PROTOTYPE <span>Process facts ≠ simulated factory settings.</span></div></dialog>
- </div>;
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createRoot } from "react-dom/client";
+import Scene from "./Scene";
+import { chapters, navigate } from "./story";
+import type { StoryState } from "./story";
+import { explorerStations } from "./facility";
+import { Education, EvidenceNotes } from "./Education";
+import "./style.css";
+function Arrow({ back = false }: { back?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      aria-hidden="true"
+      style={back ? { transform: "rotate(180deg)" } : undefined}
+    >
+      <path d="M4 12h15m-6-6 6 6-6 6" />
+    </svg>
+  );
 }
-
-createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
+function App() {
+  const pressStart = useRef<[number, number] | null>(null);
+  const [mode, setMode] = useState<"welcome" | "guided" | "explorer">(
+    "welcome",
+  );
+  const [selected, setSelected] = useState<number | null>(null),
+    [reset, setReset] = useState(0);
+  const [story, setStory] = useState<StoryState>({
+    index: 0,
+    lockedUntil: 0,
+    revision: 0,
+  });
+  const [, setClock] = useState(0),
+    [ready, setReady] = useState(false),
+    [info, setInfo] = useState(false),
+    [paused, setPaused] = useState(false),
+    [manualReduced, setManualReduced] = useState(false),
+    [osReduced, setOsReduced] = useState(
+      () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+    );
+  const [finished, setFinished] = useState(false),
+    [closing, setClosing] = useState(false);
+  const onFinale = useCallback(() => setFinished(true), []),
+    onClosing = useCallback(() => setClosing(true), []),
+    onReady = useCallback(() => setReady(true), []);
+  const reduced = manualReduced || osReduced;
+  const current = mode === "explorer" ? (selected ?? 0) : story.index;
+  const chapter = chapters[current];
+  const locked = story.lockedUntil > performance.now();
+  const dialog = useRef<HTMLDialogElement>(null),
+    sourceButton = useRef<HTMLButtonElement>(null);
+  const advance = useCallback(
+    (action: "next" | "previous" | "restart") =>
+      setStory((s) => navigate(s, action, performance.now(), reduced)),
+    [reduced],
+  );
+  const inspect = useCallback((index: number) => setSelected(index), []);
+  function overview() {
+    setSelected(null);
+    setReset((v) => v + 1);
+  }
+  function switchMode(next: "welcome" | "guided" | "explorer") {
+    setInfo(false);
+    setMode(next);
+  }
+  useLayoutEffect(() => {
+    setFinished(false);
+    setClosing(false);
+  }, [story.index, story.revision, mode]);
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setClock((v) => v + 1),
+      Math.max(0, story.lockedUntil - performance.now()) + 10,
+    );
+    return () => clearTimeout(timer);
+  }, [story]);
+  useEffect(() => {
+    const m = matchMedia("(prefers-reduced-motion: reduce)");
+    const fn = () => setOsReduced(m.matches);
+    m.addEventListener("change", fn);
+    return () => m.removeEventListener("change", fn);
+  }, []);
+  useEffect(() => {
+    if (info) dialog.current?.showModal();
+    else dialog.current?.close();
+  }, [info]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (
+        info ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(
+          (e.target as HTMLElement).tagName,
+        )
+      )
+        return;
+      if (
+        e.key === " " &&
+        (e.target as HTMLElement).closest("button,a,summary")
+      )
+        return;
+      if (mode === "guided") {
+        if (["ArrowRight", "PageDown", " "].includes(e.key)) {
+          e.preventDefault();
+          if (story.index !== 13) advance("next");
+        }
+        if (["ArrowLeft", "PageUp"].includes(e.key)) {
+          e.preventDefault();
+          advance("previous");
+        }
+        if (e.key === "Home") {
+          e.preventDefault();
+          advance("restart");
+        }
+      } else if (mode === "explorer" && e.key === "Home") {
+        e.preventDefault();
+        setSelected(null);
+        setReset((v) => v + 1);
+      }
+      if (e.key.toLowerCase() === "p") setPaused((v) => !v);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [mode, info, advance, story.index]);
+  function closeSources() {
+    setInfo(false);
+    sourceButton.current?.focus();
+  }
+  return (
+    <main
+      className={`cinema mode-${mode} ${locked && mode === "guided" ? "transitioning" : ""} ${reduced ? "reduced" : ""}`}
+      data-mode={mode}
+      data-chapter={story.index + 1}
+      data-selected={selected ?? "overview"}
+    >
+      <div className="scene">
+        <Scene
+          index={story.index}
+          revision={story.revision}
+          mode={mode}
+          selected={selected}
+          reset={reset}
+          onSelect={inspect}
+          reduced={reduced}
+          paused={paused || info}
+          onReady={onReady}
+          onFinale={onFinale}
+          onClosing={onClosing}
+        />
+      </div>
+      <div className="vignette" />
+      {mode === "guided" && (
+        <button
+          className="advance-surface"
+          aria-label="Advance to next chapter"
+          tabIndex={-1}
+          disabled={locked || story.index === 13}
+          onPointerDown={(e) => {
+            pressStart.current = [e.clientX, e.clientY];
+          }}
+          onClick={(e) => {
+            const start = pressStart.current;
+            pressStart.current = null;
+            if (
+              e.detail === 0 ||
+              !start ||
+              Math.hypot(e.clientX - start[0], e.clientY - start[1]) < 8
+            )
+              advance("next");
+          }}
+        />
+      )}
+      {mode === "guided" && (
+        <div className="film-shutter" key={`${story.revision}-${mode}`} />
+      )}
+      <header className="film-header">
+        <button
+          className="brand"
+          aria-label="FORGE welcome"
+          onClick={() => switchMode("welcome")}
+        >
+          <span className="forge-mark">
+            <i />
+            <i />
+            <i />
+          </span>
+          FORGE
+        </button>
+        {mode !== "welcome" && (
+          <nav className="mode-switch" aria-label="Experience mode">
+            <button
+              aria-pressed={mode === "guided"}
+              onClick={() => switchMode("guided")}
+            >
+              Guided Experience
+            </button>
+            <button
+              aria-pressed={mode === "explorer"}
+              onClick={() => switchMode("explorer")}
+            >
+              Factory Explorer
+            </button>
+          </nav>
+        )}
+        <div className="header-actions">
+          {mode !== "welcome" && (
+            <button
+              aria-label={paused ? "Resume animation" : "Pause animation"}
+              onClick={() => setPaused((v) => !v)}
+              title="Pause / resume (P)"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                aria-hidden="true"
+              >
+                {paused ? (
+                  <path d="m5 3 11 7-11 7z" />
+                ) : (
+                  <path d="M6 4v12M13 4v12" />
+                )}
+              </svg>
+            </button>
+          )}
+          <button
+            ref={sourceButton}
+            className="sources-button"
+            onClick={() => setInfo(true)}
+          >
+            Sources & notes <span>↗</span>
+          </button>
+        </div>
+      </header>
+      {mode === "welcome" && (
+        <section className="welcome">
+          <div className="chapter-kicker">
+            <span /> A STUDY IN MAKING
+          </div>
+          <h1>
+            One factory.
+            <br />
+            <span>Two ways to explore.</span>
+          </h1>
+          <p>Follow the story, or find your own path through the machinery.</p>
+          <div className="welcome-choices">
+            <button
+              className="welcome-choice"
+              onClick={() => switchMode("guided")}
+            >
+              <span>
+                <strong>Guided Experience</strong>
+                <small>
+                  Fourteen cinematic chapters. Advance at your own pace.
+                </small>
+              </span>
+              <Arrow />
+            </button>
+            <button
+              className="welcome-choice"
+              onClick={() => switchMode("explorer")}
+            >
+              <span>
+                <strong>Factory Explorer</strong>
+                <small>
+                  Orbit the connected factory. Select a machine to look closer.
+                </small>
+              </span>
+              <Arrow />
+            </button>
+          </div>
+          <span className="welcome-note">
+            Independent educational reconstruction · Illustrative facility
+            layout
+          </span>
+        </section>
+      )}
+      {mode === "guided" && (
+        <>
+          <div className="chapter-rail" aria-hidden="true">
+            <span>{String(story.index + 1).padStart(2, "0")}</span>
+            <i />
+            <span>14</span>
+          </div>
+          <article
+            className="chapter-content"
+            key={chapter.id}
+            aria-live="polite"
+          >
+            <div className="chapter-kicker">
+              <span />
+              {chapter.part}
+            </div>
+            <p className="chapter-subtitle">{chapter.subtitle}</p>
+            <h1>
+              {(story.index === 13 && closing
+                ? "Thanks for exploring the journey."
+                : chapter.title
+              )
+                .split("\n")
+                .map((line, i) => (
+                  <span key={line} className={i ? "soft-line" : ""}>
+                    {line}
+                  </span>
+                ))}
+            </h1>
+            <Education key={chapter.id} index={story.index} />
+          </article>
+          <nav className="film-navigation" aria-label="Chapter navigation">
+            <div className="previous-actions">
+              <button
+                aria-label="Previous chapter"
+                disabled={locked || story.index === 0}
+                onClick={() => advance("previous")}
+              >
+                <Arrow back />
+              </button>
+              <button
+                className="restart"
+                aria-label="Restart presentation"
+                disabled={locked}
+                onClick={() => advance("restart")}
+              >
+                ↺ <span>Restart</span>
+              </button>
+            </div>
+            <div
+              className="progress-track"
+              role="progressbar"
+              aria-label={`Chapter ${story.index + 1} of 14`}
+              aria-valuenow={story.index + 1}
+              aria-valuemin={1}
+              aria-valuemax={14}
+            >
+              {chapters.map((c, i) => (
+                <i key={c.id} className={i <= story.index ? "complete" : ""} />
+              ))}
+            </div>
+            {story.index === 13 && !finished ? (
+              <span className="departure-pending">Shipment departing…</span>
+            ) : (
+              <button
+                className="next-chapter"
+                disabled={locked}
+                onClick={() => advance(story.index === 13 ? "restart" : "next")}
+              >
+                {story.index === 13
+                  ? "Experience it again"
+                  : story.index === 0
+                    ? "Begin the journey"
+                    : "Continue"}
+                <Arrow />
+              </button>
+            )}
+          </nav>
+        </>
+      )}
+      {mode === "explorer" && (
+        <>
+          <div className="explorer-toolbar">
+            <label>
+              Find a process
+              <select
+                aria-label="Find a process"
+                value={selected ?? ""}
+                onChange={(e) =>
+                  e.target.value ? inspect(Number(e.target.value)) : overview()
+                }
+              >
+                <option value="">Complete factory overview</option>
+                {explorerStations.map((s) => (
+                  <option key={s.id} value={s.chapter}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="reset-view" onClick={overview}>
+              ↺ Reset view
+            </button>
+          </div>
+          <div className="station-markers">
+            {explorerStations.map((s) => (
+              <button
+                key={s.id}
+                data-station={s.chapter}
+                className={`marker ${s.chapter === selected ? "selected" : ""}`}
+                onClick={() => inspect(s.chapter)}
+                aria-label={`Inspect ${s.title}`}
+                title={s.title}
+              >
+                <span>{String(s.chapter + 1).padStart(2, "0")}</span>
+              </button>
+            ))}
+          </div>
+          {selected === null ? (
+            <section className="explorer-intro">
+              <span className="chapter-kicker">ONE CONNECTED FACILITY</span>
+              <h1>Follow the flow.</h1>
+              <p>
+                Can bodies on conveyors. Ingredients through pipes.
+                <br />
+                Select any numbered machine to see how it works.
+              </p>
+              <span className="layout-note">
+                An illustrative layout, not a documented Red Bull floor plan.
+              </span>
+            </section>
+          ) : (
+            <section className="inspector" key={chapter.id} aria-live="polite">
+              <button className="return-factory" onClick={overview}>
+                <Arrow back /> Return to Factory
+              </button>
+              <span className="chapter-subtitle">
+                {explorerStations.find((s) => s.chapter === selected)?.zone}
+              </span>
+              <h1>{chapter.subtitle.replace(/^\d+ \/ /, "").toLowerCase()}</h1>
+              <Education key={chapter.id} compact index={selected} />
+            </section>
+          )}
+          <div className="explorer-hint">
+            <span>Drag to orbit</span>
+            <i />
+            <span>Scroll / pinch to zoom</span>
+            <i />
+            <span>Right-drag / two fingers to pan</span>
+          </div>
+        </>
+      )}
+      <footer>
+        <span>
+          Independent educational visualization. Not affiliated with or endorsed
+          by Red Bull.
+        </span>
+        <div>
+          <button
+            aria-pressed={reduced}
+            disabled={osReduced}
+            onClick={() => setManualReduced((v) => !v)}
+          >
+            {reduced ? "Reduced motion on" : "Reduce motion"}
+          </button>
+          {mode === "guided" && (
+            <span className="keyboard-hint">← → TO EXPLORE</span>
+          )}
+          <span className="phase-label">PHASE 03</span>
+        </div>
+      </footer>
+      {!ready && (
+        <div className="loading">
+          <span className="forge-mark">
+            <i />
+            <i />
+            <i />
+          </span>
+          <p>Preparing the factory</p>
+        </div>
+      )}
+      <dialog
+        ref={dialog}
+        onCancel={closeSources}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeSources();
+        }}
+      >
+        <div className="dialog-top">
+          <span>THE EVIDENCE BEHIND THE EXPERIENCE</span>
+          <button aria-label="Close sources" onClick={closeSources}>
+            ×
+          </button>
+        </div>
+        <EvidenceNotes index={current} />
+      </dialog>
+    </main>
+  );
+}
+createRoot(document.getElementById("root")!).render(<App />);
